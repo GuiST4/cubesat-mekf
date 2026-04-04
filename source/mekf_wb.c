@@ -256,6 +256,72 @@ void Inv6x6(const float *m, float *output)
             output[i * 6 + j] = aug[i][j + 6];
 }
 
+void LUSolve6x6(const float *A, const float *B, int nrhs, float *X)
+{
+    float LU[6][6];
+    int piv[6];
+
+    for (int i = 0; i < 6; i++)
+    {
+        piv[i] = i;
+        for (int j = 0; j < 6; j++)
+            LU[i][j] = A[i * 6 + j];
+    }
+
+    for (int k = 0; k < 6; k++)
+    {
+        int max_row = k;
+        float max_val = fabsf(LU[k][k]);
+        for (int i = k + 1; i < 6; i++)
+            if (fabsf(LU[i][k]) > max_val)
+            {
+                max_val = fabsf(LU[i][k]);
+                max_row = i;
+            }
+
+        if (max_row != k)
+        {
+            int tmp = piv[k];
+            piv[k] = piv[max_row];
+            piv[max_row] = tmp;
+            for (int j = 0; j < 6; j++)
+            {
+                float t = LU[k][j];
+                LU[k][j] = LU[max_row][j];
+                LU[max_row][j] = t;
+            }
+        }
+
+        for (int i = k + 1; i < 6; i++)
+        {
+            LU[i][k] /= LU[k][k];
+            for (int j = k + 1; j < 6; j++)
+                LU[i][j] -= LU[i][k] * LU[k][j];
+        }
+    }
+
+    for (int c = 0; c < nrhs; c++)
+    {
+        float y[6];
+        for (int i = 0; i < 6; i++)
+            y[i] = B[piv[i] * nrhs + c];
+
+        for (int i = 1; i < 6; i++)
+            for (int j = 0; j < i; j++)
+                y[i] -= LU[i][j] * y[j];
+
+        for (int i = 5; i >= 0; i--)
+        {
+            for (int j = i + 1; j < 6; j++)
+                y[i] -= LU[i][j] * y[j];
+            y[i] /= LU[i][i];
+        }
+
+        for (int i = 0; i < 6; i++)
+            X[i * nrhs + c] = y[i];
+    }
+}
+
 void mekf_wb(const MEKF_State *input, MEKF_State *output, const float *omega, const float *Br, const float *Nr)
 {
     const float *qkk = input->q;
@@ -382,9 +448,16 @@ void mekf_wb(const MEKF_State *input, MEKF_State *output, const float *omega, co
     Madd(temp20, W, 6, 6, Sk1);             // Sk1 = Ck1*Pk1k*Ck1' + W
 
     // 3. Kalman Gain
-    float Kk1[36] = {0}, invSk1[36] = {0};
-    Inv6x6(Sk1, invSk1);                    // invSk1 = Sk1^-1
-    Mprod(temp19, invSk1, 6, 6, 6, 1, Kk1); // Kk1 = Pk1k*Ck1'*Sk1^-1
+
+    // float Kk1[36] = {0}, invSk1[36] = {0};
+    // Inv6x6(Sk1, invSk1);                    // invSk1 = Sk1^-1
+    // Mprod(temp19, invSk1, 6, 6, 6, 1, Kk1); // Kk1 = Pk1k*Ck1'*Sk1^-1`
+
+    // Solve Sk1*Kk1^T = temp19^T, Sk1 is symmetric
+    float Kk1[36] = {0}, temp19T[36] = {0}, Kk1T_solve[36] = {0};
+    Mtranspose(temp19, 6, 6, temp19T);
+    LUSolve6x6(Sk1, temp19T, 6, Kk1T_solve);
+    Mtranspose(Kk1T_solve, 6, 6, Kk1);
 
     // 4. Update
     float dx[6] = {0};
@@ -395,9 +468,16 @@ void mekf_wb(const MEKF_State *input, MEKF_State *output, const float *omega, co
     float bk1k1[3] = {0};
     Madd(bkk, db, 3, 1, bk1k1); // bk1k1 = bkk + db
 
-    float qk1k1[4] = {0}, temp21[4] = {0};
+    float qk1k1temp[4] = {0}, temp21[4] = {0};
     expq(phi_corr, temp21);
-    Mprod(Lqk1k, temp21, 4, 4, 1, 1, qk1k1); // qk1k1 = L(qk1k)*expq(phi_corr)
+    Mprod(Lqk1k, temp21, 4, 4, 1, 1, qk1k1temp); // qk1k1 = L(qk1k)*expq(phi_corr)
+
+    float q_norm = sqrtf(qk1k1temp[0] * qk1k1temp[0] + qk1k1temp[1] * qk1k1temp[1] + qk1k1temp[2] * qk1k1temp[2] + qk1k1temp[3] * qk1k1temp[3]);
+    float qk1k1[4] = {0};
+    qk1k1[0] = qk1k1temp[0] / q_norm;
+    qk1k1[1] = qk1k1temp[1] / q_norm;
+    qk1k1[2] = qk1k1temp[2] / q_norm;
+    qk1k1[3] = qk1k1temp[3] / q_norm;
 
     float Kk1T[36] = {0}, temp22[36] = {0}, temp23[36] = {0}, temp24[36] = {0}, temp25[36] = {0}, temp26[36] = {0}, temp27[36] = {0}, temp28[36] = {0};
     Mtranspose(Kk1, 6, 6, Kk1T);            // Kk1T = Kk1'

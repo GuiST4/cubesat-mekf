@@ -37,4 +37,6 @@ void Ck1Transform(const float *Ck_11, const float *Ck_21, float *Ck1);
 
 void Inv6x6(const float *m, float *output);
 
+void LUSolve6x6(const float *A, const float *B, int nrhs, float *X);
+
 #endif
