@@ -53,6 +53,8 @@ void loop() {
 
 This filter was tested against a MATLAB/Simulink NanoSat Simulator. The embedded C implementation closely matches the numerical performance of the double-precision Simulink reference model.
 
+![AttGif](https://github.com/user-attachments/assets/aadb67e4-97f7-430d-908e-a4953cd7773f)
+
 ### 1. Attitude Tracking
 Tracks the simulated true state across all four quaternion components.
 
