@@ -58,22 +58,22 @@ This filter was tested against a MATLAB/Simulink NanoSat Simulator. The embedded
 ### 1. Attitude Tracking
 Tracks the simulated true state across all four quaternion components.
 
-![Quaternion Tracking](images/01_Quaternion_Tracking.png)
 
 ### 2. Gyro Bias Estimation
 Estimates and removes gyroscope biases using the vector measurements for drift correction.
 
-![Gyro Bias Tracking](images/02_Bias_Tracking.png)
+
+
 
 ### 3. Absolute Attitude Error
 Shows the physical pointing error of the C implementation compared to the simulation environment.
 
-![Attitude Error](images/03_Attitude_Error.png)
+
 
 ### 4. Implementation Accuracy (C vs. Simulink)
 Compares the C code output directly against the Simulink MEKF. The Principal Rotation Angle difference stays around **~0.0001 degrees**, showing strong numerical agreement.
 
-![Implementation Difference](images/04_Implementation_Difference.png)
+
 
 ---
 
