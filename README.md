@@ -30,14 +30,14 @@ void init() {
     current_state.b[0] = 0.0f; current_state.b[1] = 0.0f; current_state.b[2] = 0.0f;
     current_state.dt = 0.01f; // 100 Hz
 
-    // Note: Covariance (P), Process Noise (V), and Measurement Noise (W) 
+    // Note: Covariance (P), Process Noise (V), and Measurement Noise (W) matrices 
 }
 
 void loop() {
     // 1. Gather sensor data and reference vectors
     float gyro[3];  // Angular rates from Gyroscope (rad/s)
-    float Br[6];    // Body frame measurements [Sun_x, Sun_y, Sun_z, Mag_x, Mag_y, Mag_z] (Unit vectors)
-    float Nr[6];    // Inertial reference vectors [Sun_x, Sun_y, Sun_z, Mag_x, Mag_y, Mag_z] (Unit vectors)
+    float Br[9];    // Body frame measurements [Sun(3), Mag(3), EHS(3)] (Unit vectors)
+    float Nr[9];    // Inertial reference vectors [Sun(3), Mag(3), EHS(3)] (Unit vectors)
     
     ReadSensors(gyro, Br, Nr); // Example hardware fetch
 
@@ -45,9 +45,7 @@ void loop() {
     mekf_wb(&current_state, &next_state, gyro, Br, Nr);
 
     // 3. Propagate the state forward for the next cycle
-    memcpy(current_state.q, next_state.q, 4 * sizeof(float));
-    memcpy(current_state.b, next_state.b, 3 * sizeof(float));
-    memcpy(current_state.P, next_state.P, 36 * sizeof(float));
+    current_state = next_state;
 }
 ```
 
