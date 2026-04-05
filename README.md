@@ -45,9 +45,7 @@ void loop() {
     mekf_wb(&current_state, &next_state, gyro, Br, Nr);
 
     // 3. Propagate the state forward for the next cycle
-    memcpy(current_state.q, next_state.q, 4 * sizeof(float));
-    memcpy(current_state.b, next_state.b, 3 * sizeof(float));
-    memcpy(current_state.P, next_state.P, 36 * sizeof(float));
+    current_state = next_state;
 }
 ```
 
