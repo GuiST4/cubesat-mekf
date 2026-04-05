@@ -174,23 +174,28 @@ void AkTransform(const float *Ak11, const float *Ak12, float *Ak)
 
 void Qk1Transform(const float *Q, float *Qfull)
 {
-    for (int i = 0; i < 36; i++)
+    for (int i = 0; i < 81; i++)
         Qfull[i] = 0.0f;
 
     // Top-left
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
-            Qfull[i * 6 + j] = Q[i * 3 + j];
+            Qfull[i * 9 + j] = Q[i * 3 + j];
+
+    // Middle
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+            Qfull[(i + 3) * 9 + (j + 3)] = Q[i * 3 + j];
 
     // Bottom-right
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
-            Qfull[(i + 3) * 6 + (j + 3)] = Q[i * 3 + j];
+            Qfull[(i + 6) * 9 + (j + 6)] = Q[i * 3 + j];
 }
 
-void Ck1Transform(const float *Ck_11, const float *Ck_21, float *Ck1)
+void Ck1Transform(const float *Ck_11, const float *Ck_21, const float *Ck_31, float *Ck1)
 {
-    for (int i = 0; i < 36; i++)
+    for (int i = 0; i < 54; i++)
         Ck1[i] = 0.0f;
 
     // Top-left Ck_11
@@ -198,81 +203,34 @@ void Ck1Transform(const float *Ck_11, const float *Ck_21, float *Ck1)
         for (int j = 0; j < 3; j++)
             Ck1[i * 6 + j] = Ck_11[i * 3 + j];
 
-    // Bottom-left Ck_21
+    // Mid-left Ck_21
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
             Ck1[(i + 3) * 6 + j] = Ck_21[i * 3 + j];
+
+    // Bottom-left Ck_21
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+            Ck1[(i + 6) * 6 + j] = Ck_31[i * 3 + j];
 }
 
-void Inv6x6(const float *m, float *output)
+void LUSolve9x9(const float *A, const float *B, int nrhs, float *X)
 {
-    float aug[6][12];
+    float LU[9][9];
+    int piv[9];
 
-    for (int i = 0; i < 6; i++)
-        for (int j = 0; j < 6; j++)
-        {
-            aug[i][j] = m[i * 6 + j];
-            aug[i][j + 6] = (i == j) ? 1.0f : 0.0f;
-        }
-
-    for (int i = 0; i < 6; i++)
-    {
-
-        int max_row = i;
-        float max_val = fabsf(aug[i][i]);
-        for (int p = i + 1; p < 6; p++)
-        {
-            if (fabsf(aug[p][i]) > max_val)
-            {
-                max_val = fabsf(aug[p][i]);
-                max_row = p;
-            }
-        }
-        if (max_row != i)
-        {
-            for (int j = 0; j < 12; j++)
-            {
-                float tmp = aug[i][j];
-                aug[i][j] = aug[max_row][j];
-                aug[max_row][j] = tmp;
-            }
-        }
-
-        float pivot = aug[i][i];
-        for (int j = 0; j < 12; j++)
-            aug[i][j] /= pivot;
-        for (int k = 0; k < 6; k++)
-        {
-            if (k == i)
-                continue;
-            float factor = aug[k][i];
-            for (int j = 0; j < 12; j++)
-                aug[k][j] -= factor * aug[i][j];
-        }
-    }
-
-    for (int i = 0; i < 6; i++)
-        for (int j = 0; j < 6; j++)
-            output[i * 6 + j] = aug[i][j + 6];
-}
-
-void LUSolve6x6(const float *A, const float *B, int nrhs, float *X)
-{
-    float LU[6][6];
-    int piv[6];
-
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < 9; i++)
     {
         piv[i] = i;
-        for (int j = 0; j < 6; j++)
-            LU[i][j] = A[i * 6 + j];
+        for (int j = 0; j < 9; j++)
+            LU[i][j] = A[i * 9 + j];
     }
 
-    for (int k = 0; k < 6; k++)
+    for (int k = 0; k < 9; k++)
     {
         int max_row = k;
         float max_val = fabsf(LU[k][k]);
-        for (int i = k + 1; i < 6; i++)
+        for (int i = k + 1; i < 9; i++)
             if (fabsf(LU[i][k]) > max_val)
             {
                 max_val = fabsf(LU[i][k]);
@@ -284,7 +242,7 @@ void LUSolve6x6(const float *A, const float *B, int nrhs, float *X)
             int tmp = piv[k];
             piv[k] = piv[max_row];
             piv[max_row] = tmp;
-            for (int j = 0; j < 6; j++)
+            for (int j = 0; j < 9; j++)
             {
                 float t = LU[k][j];
                 LU[k][j] = LU[max_row][j];
@@ -292,32 +250,33 @@ void LUSolve6x6(const float *A, const float *B, int nrhs, float *X)
             }
         }
 
-        for (int i = k + 1; i < 6; i++)
+        for (int i = k + 1; i < 9; i++)
         {
             LU[i][k] /= LU[k][k];
-            for (int j = k + 1; j < 6; j++)
+            for (int j = k + 1; j < 9; j++)
                 LU[i][j] -= LU[i][k] * LU[k][j];
         }
     }
 
     for (int c = 0; c < nrhs; c++)
     {
-        float y[6];
-        for (int i = 0; i < 6; i++)
+        float y[9];
+        for (int i = 0; i < 9; i++)
             y[i] = B[piv[i] * nrhs + c];
 
-        for (int i = 1; i < 6; i++)
+        for (int i = 1; i < 9; i++)
             for (int j = 0; j < i; j++)
                 y[i] -= LU[i][j] * y[j];
 
-        for (int i = 5; i >= 0; i--)
+        // Note: The starting index for backward substitution changes from 5 to 8
+        for (int i = 8; i >= 0; i--)
         {
-            for (int j = i + 1; j < 6; j++)
+            for (int j = i + 1; j < 9; j++)
                 y[i] -= LU[i][j] * y[j];
             y[i] /= LU[i][i];
         }
 
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < 9; i++)
             X[i * nrhs + c] = y[i];
     }
 }
@@ -393,15 +352,15 @@ void mekf_wb(const MEKF_State *input, MEKF_State *output, const float *omega, co
 
     Mprod(Lqk1kT, temp4, 4, 4, 3, 1, temp5); // temp5 = L(qk1k)'*temp4 = L(qk1k)'*R(qk1k)*H
 
-    float Qk1[9] = {0}, Qfull[36] = {0};
+    float Qk1[9] = {0}, Qfull[81] = {0};
     Mprod(HT, temp5, 3, 4, 3, 1, Qk1); // Qk1 = HT*temp5 = HT*L(qk1k)'*R(qk1k)*H
     Qk1Transform(Qk1, Qfull);          // Qfull = [Qk1, zeros(3,3), zeros(3,3), Qk1]
 
-    float zk1[6] = {0}, temp6[6] = {0};
-    Mprod(Qfull, Nr, 6, 6, 1, 1, temp6); // temp6 = Qfull*Nr
-    Msub(Br, temp6, 6, 1, zk1);          // zk1 = Br - temp6 = Br - Qfull*Nr
+    float zk1[9] = {0}, temp6[9] = {0};
+    Mprod(Qfull, Nr, 9, 9, 1, 1, temp6); // temp6 = Qfull*Nr
+    Msub(Br, temp6, 9, 1, zk1);          // zk1 = Br - temp6 = Br - Qfull*Nr
 
-    float Nr_sun[3] = {Nr[0], Nr[1], Nr[2]}, Nr_mag[3] = {Nr[3], Nr[4], Nr[5]};
+    float Nr_sun[3] = {Nr[0], Nr[1], Nr[2]}, Nr_mag[3] = {Nr[3], Nr[4], Nr[5]}, Nr_ehs[3] = {Nr[6], Nr[7], Nr[8]};
     float T[16] = {1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1};
 
     // Sun Sensor Measurements (Unit Vector)
@@ -438,14 +397,31 @@ void mekf_wb(const MEKF_State *input, MEKF_State *output, const float *omega, co
     Mprod(temp17, Gqk1k, 4, 4, 3, 1, temp18); // temp18 = (L(qk1k)'*L(H*Nr_mag) + R(qk1k)*R(H*Nr_mag)*T)*G(qk1k)
     Mprod(HT, temp18, 3, 4, 3, 1, Ck1_21);    // Ck1_21 = H'*(L(qk1k)'*L(H*Nr_mag) + R(qk1k)*R(H*Nr_mag)*T)*G(qk1k)
 
-    float Ck1[36] = {0}, Ck1T[36] = {0};
-    Ck1Transform(Ck1_11, Ck1_21, Ck1); // Ck1 = [[Ck1_11; Ck1_21], zeros(6,3)]
-    Mtranspose(Ck1, 6, 6, Ck1T);       // Ck1T =  Ck1'
+    // Earth Horizon Sensor Measurements (Unit Vector)
+    float temp29[4] = {0}, temp30[16] = {0}, temp31[16] = {0}, temp32[16] = {0}, temp33[16] = {0}, temp34[12] = {0};
 
-    float Sk1[36] = {0}, temp19[36] = {0}, temp20[36] = {0};
-    Mprod(Pk1k, Ck1T, 6, 6, 6, 1, temp19);  // temp19 = Pk1k*Ck1'
-    Mprod(Ck1, temp19, 6, 6, 6, 1, temp20); // temp20 = Ck1*Pk1k*Ck1'
-    Madd(temp20, W, 6, 6, Sk1);             // Sk1 = Ck1*Pk1k*Ck1' + W
+    float Lqt29[16] = {0}, Rqt29[16] = {0}, Ck1_31[9] = {0};
+
+    Mprod(H, Nr_ehs, 4, 3, 1, 1, temp29); // temp29 = H*Nr_ehs
+
+    Lq(temp29, Lqt29);
+    Rq(temp29, Rqt29);
+
+    Mprod(Lqk1kT, Lqt29, 4, 4, 4, 1, temp30); // temp30 = L(qk1k)'*L(H*Nr_ehs)
+    Mprod(Rqt29, T, 4, 4, 4, 1, temp31);      // temp31 = R(H*Nr_ehs)*T
+    Mprod(Rqk1k, temp31, 4, 4, 4, 1, temp32); // temp32 = R(qk1k)*R(H*Nr_ehs)*T
+    Madd(temp30, temp32, 4, 4, temp33);       // temp33 = L(qk1k)'*L(H*Nr_ehs) + R(qk1k)*R(H*Nr_ehs)*T
+    Mprod(temp33, Gqk1k, 4, 4, 3, 1, temp34); // temp34 = (L(qk1k)'*L(H*Nr_ehs) + R(qk1k)*R(H*Nr_ehs)*T)*G(qk1k)
+    Mprod(HT, temp34, 3, 4, 3, 1, Ck1_31);    // Ck1_31 = H'*(L(qk1k)'*L(H*Nr_ehs) + R(qk1k)*R(H*Nr_ehs)*T)*G(qk1k)
+
+    float Ck1[54] = {0}, Ck1T[54] = {0};
+    Ck1Transform(Ck1_11, Ck1_21, Ck1_31, Ck1); // Ck1 = [[Ck1_11; Ck1_21; Ck1_31], zeros(9,3)]
+    Mtranspose(Ck1, 9, 6, Ck1T);               // Ck1T =  Ck1'
+
+    float Sk1[81] = {0}, temp19[54] = {0}, temp20[81] = {0};
+    Mprod(Pk1k, Ck1T, 6, 6, 9, 1, temp19);  // temp19 = Pk1k*Ck1'
+    Mprod(Ck1, temp19, 9, 6, 9, 1, temp20); // temp20 = Ck1*Pk1k*Ck1'
+    Madd(temp20, W, 9, 9, Sk1);             // Sk1 = Ck1*Pk1k*Ck1' + W
 
     // 3. Kalman Gain
 
@@ -454,14 +430,14 @@ void mekf_wb(const MEKF_State *input, MEKF_State *output, const float *omega, co
     // Mprod(temp19, invSk1, 6, 6, 6, 1, Kk1); // Kk1 = Pk1k*Ck1'*Sk1^-1`
 
     // Solve Sk1*Kk1^T = temp19^T, Sk1 is symmetric
-    float Kk1[36] = {0}, temp19T[36] = {0}, Kk1T_solve[36] = {0};
-    Mtranspose(temp19, 6, 6, temp19T);
-    LUSolve6x6(Sk1, temp19T, 6, Kk1T_solve);
-    Mtranspose(Kk1T_solve, 6, 6, Kk1);
+    float Kk1[54] = {0}, temp19T[54] = {0}, Kk1T_solve[54] = {0};
+    Mtranspose(temp19, 6, 9, temp19T);
+    LUSolve9x9(Sk1, temp19T, 6, Kk1T_solve);
+    Mtranspose(Kk1T_solve, 9, 6, Kk1);
 
     // 4. Update
     float dx[6] = {0};
-    Mprod(Kk1, zk1, 6, 6, 1, 1, dx);
+    Mprod(Kk1, zk1, 6, 9, 1, 1, dx);
 
     float phi_corr[3] = {dx[0], dx[1], dx[2]}, db[3] = {dx[3], dx[4], dx[5]};
 
@@ -479,11 +455,11 @@ void mekf_wb(const MEKF_State *input, MEKF_State *output, const float *omega, co
     qk1k1[2] = qk1k1temp[2] / q_norm;
     qk1k1[3] = qk1k1temp[3] / q_norm;
 
-    float Kk1T[36] = {0}, temp22[36] = {0}, temp23[36] = {0}, temp24[36] = {0}, temp25[36] = {0}, temp26[36] = {0}, temp27[36] = {0}, temp28[36] = {0};
-    Mtranspose(Kk1, 6, 6, Kk1T);            // Kk1T = Kk1'
-    Mprod(W, Kk1T, 6, 6, 6, 1, temp22);     // temp22 = W*Kk1'
-    Mprod(Kk1, temp22, 6, 6, 6, 1, temp23); // temp23 = Kk1*W*Kk1'
-    Mprod(Kk1, Ck1, 6, 6, 6, 1, temp24);    // temp24 = Kk1*Ck1
+    float Kk1T[54] = {0}, temp22[54] = {0}, temp23[36] = {0}, temp24[36] = {0}, temp25[36] = {0}, temp26[36] = {0}, temp27[36] = {0}, temp28[36] = {0};
+    Mtranspose(Kk1, 6, 9, Kk1T);            // Kk1T = Kk1'
+    Mprod(W, Kk1T, 9, 9, 6, 1, temp22);     // temp22 = W*Kk1'
+    Mprod(Kk1, temp22, 6, 9, 6, 1, temp23); // temp23 = Kk1*W*Kk1'
+    Mprod(Kk1, Ck1, 6, 9, 6, 1, temp24);    // temp24 = Kk1*Ck1
     float eye6x6[36] = {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1};
     Msub(eye6x6, temp24, 6, 6, temp25);        // temp25 = I - Kk1*Ck1
     Mtranspose(temp25, 6, 6, temp26);          // temp26 = (I - Kk1*Ck1)'
