@@ -1,13 +1,11 @@
 # NanoSat MEKF Attitude Estimator 🛰️
 
-A C implementation of a Multiplicative Extended Kalman Filter (MEKF) for NanoSat attitude determination.
-
-Designed for modern ARM Cortex-M microcontrollers with Hardware Floating-Point Units (like the **STM32 F7 and H7 series**), this project adapts double-precision simulation algorithms for 32-bit single-precision embedded environments.
+A Matlab/C implementation of a Multiplicative Extended Kalman Filter (MEKF) for NanoSat attitude determination.
 
 ## 🚀 Key Features
 
-*   **Sensor Fusion:** Couples gyroscope rate integration with vector measurements from a **Sun Sensor and Magnetometer**.
-*   **Joseph Form Covariance:** Maintains a positive semi-definite $P$ matrix to help mitigate 32-bit float truncation errors over time.
+*   **Sensor Fusion:** Couples gyroscope rate integration with vector measurements from a **Sun Sensor, Magnetometer & Earth Horizon Sensor**.
+*   **Joseph Form Covariance:** Maintains a positive semi-definite $P$ matrix.
 *   **Memory Efficiency:** Uses a ~6 KB stack footprint with flattened 1D arrays, avoiding dynamic memory allocation.
 
 ---
@@ -79,8 +77,7 @@ Compares the C code output directly against the Simulink MEKF. The Principal Rot
 
 ## 💻 Hardware Integration Notes
 
-*   **FPU Requirement:** Ensure your compiler flags have hardware floating-point math enabled. Emulated floating-point math will noticeably impact execution speed.
-*   **Sample Rates:** The filter structure assumes a higher frequency prediction step (Gyro) and a lower frequency innovation step (Sun/Mag). Ensure the `dt` parameter is updated in your hardware timer interrupts to handle multi-rate sensors.
+*   **FPU Requirement:** Ensure your compiler flags have hardware floating-point math enabled.
 
 ## 📁 File Structure
 
